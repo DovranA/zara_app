@@ -16,7 +16,7 @@ export default function BottomNav() {
     ];
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.outline }]}>
+        <View style={[styles.container, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.outline, display: pathname.includes("form") ? "none" : "flex" }]}>
             {navItems.map((item) => {
                 const isActive = pathname === item.path || pathname?.startsWith(item.path + '/');
                 return (
@@ -44,13 +44,12 @@ export default function BottomNav() {
 const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
-        height: 60,
-        borderTopWidth: 1,
         elevation: 8,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
+        paddingBottom: 10
     },
     navItem: {
         flex: 1,

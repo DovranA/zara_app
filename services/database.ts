@@ -11,10 +11,11 @@ export interface User {
 export interface Product {
     id?: number;
     name: string;
-    sku: string;
     price: number;
-    stock: number;
-    image_path: string;
+    note?: string;
+    user_id?: number;
+    delivery_date?: string;
+    images: string[];
 }
 
 export interface Delivery {
@@ -58,10 +59,18 @@ class DatabaseService {
       CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        sku TEXT,
         price REAL DEFAULT 0,
-        stock INTEGER DEFAULT 0,
-        image_path TEXT
+        note TEXT,
+        user_id INTEGER,
+        delivery_date TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS product_images (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        image_path TEXT NOT NULL,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
       );
 
       CREATE TABLE IF NOT EXISTS deliveries (
@@ -85,6 +94,27 @@ class DatabaseService {
         FOREIGN KEY (product_id) REFERENCES products(id)
       );
     `);
+
+        // Migration: Add user_id to products if it doesn't exist
+        try {
+            await this.db.execAsync('ALTER TABLE products ADD COLUMN user_id INTEGER REFERENCES users(id)');
+        } catch (error) {
+            // Column likely already exists, ignore
+        }
+
+        // Migration: Add note to products if it doesn't exist
+        try {
+            await this.db.execAsync('ALTER TABLE products ADD COLUMN note TEXT');
+        } catch (error) {
+            // Column likely already exists, ignore
+        }
+
+        // Migration: Add delivery_date to products if it doesn't exist
+        try {
+            await this.db.execAsync('ALTER TABLE products ADD COLUMN delivery_date TEXT');
+        } catch (error) {
+            // Column likely already exists, ignore
+        }
     }
 
     // User CRUD
@@ -125,35 +155,68 @@ class DatabaseService {
     // Product CRUD
     async getProducts(): Promise<Product[]> {
         if (!this.db) return [];
-        const result = await this.db.getAllAsync<Product>('SELECT * FROM products ORDER BY name');
-        return result;
+        const products = await this.db.getAllAsync<any>('SELECT * FROM products ORDER BY name');
+
+        const productsWithImages = await Promise.all(products.map(async (product) => {
+            const images = await this.db!.getAllAsync<{ image_path: string }>('SELECT image_path FROM product_images WHERE product_id = ?', [product.id]);
+            return { ...product, images: images.map(img => img.image_path) };
+        }));
+
+        return productsWithImages;
     }
 
     async getProductById(id: number): Promise<Product | null> {
         if (!this.db) return null;
-        const result = await this.db.getFirstAsync<Product>('SELECT * FROM products WHERE id = ?', [id]);
-        return result || null;
+        const product = await this.db.getFirstAsync<any>('SELECT * FROM products WHERE id = ?', [id]);
+        if (!product) return null;
+
+        const images = await this.db.getAllAsync<{ image_path: string }>('SELECT image_path FROM product_images WHERE product_id = ?', [id]);
+        return { ...product, images: images.map(img => img.image_path) };
     }
 
     async createProduct(product: Product): Promise<number> {
         if (!this.db) return 0;
         const result = await this.db.runAsync(
-            'INSERT INTO products (name, sku, price, stock, image_path) VALUES (?, ?, ?, ?, ?)',
-            [product.name, product.sku, product.price, product.stock, product.image_path]
+            'INSERT INTO products (name, price, note, user_id, delivery_date) VALUES (?, ?, ?, ?, ?)',
+            [product.name, product.price, product.note || null, product.user_id || null, product.delivery_date || null]
         );
-        return result.lastInsertRowId;
+        const productId = result.lastInsertRowId;
+
+        if (product.images && product.images.length > 0) {
+            for (const imagePath of product.images) {
+                await this.db.runAsync(
+                    'INSERT INTO product_images (product_id, image_path) VALUES (?, ?)',
+                    [productId, imagePath]
+                );
+            }
+        }
+
+        return productId;
     }
 
     async updateProduct(product: Product): Promise<void> {
         if (!this.db || !product.id) return;
         await this.db.runAsync(
-            'UPDATE products SET name = ?, sku = ?, price = ?, stock = ?, image_path = ? WHERE id = ?',
-            [product.name, product.sku, product.price, product.stock, product.image_path, product.id]
+            'UPDATE products SET name = ?, price = ?, note = ?, user_id = ?, delivery_date = ? WHERE id = ?',
+            [product.name, product.price, product.note || null, product.user_id || null, product.delivery_date || null, product.id]
         );
+
+        // Update images: delete all and re-insert (simplest approach)
+        await this.db.runAsync('DELETE FROM product_images WHERE product_id = ?', [product.id]);
+
+        if (product.images && product.images.length > 0) {
+            for (const imagePath of product.images) {
+                await this.db.runAsync(
+                    'INSERT INTO product_images (product_id, image_path) VALUES (?, ?)',
+                    [product.id, imagePath]
+                );
+            }
+        }
     }
 
     async deleteProduct(id: number): Promise<void> {
         if (!this.db) return;
+        await this.db.runAsync('DELETE FROM product_images WHERE product_id = ?', [id]);
         await this.db.runAsync('DELETE FROM products WHERE id = ?', [id]);
     }
 

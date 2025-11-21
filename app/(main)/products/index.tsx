@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, Image, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, Image, Alert, Dimensions, Linking } from 'react-native';
 import { FAB, Card, Title, Paragraph, IconButton, Searchbar, useTheme } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { useProducts, useDeleteProduct } from '../../services/queries';
+import { useProducts, useDeleteProduct, useUsers } from '../../../services/queries';
 
 export default function ProductListScreen() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -10,7 +10,13 @@ export default function ProductListScreen() {
     const router = useRouter();
 
     const { data: products = [], isLoading } = useProducts();
+    const { data: users = [] } = useUsers();
     const deleteProductMutation = useDeleteProduct();
+
+    const userMap = users.reduce((acc, user) => {
+        if (user.id) acc[user.id] = user;
+        return acc;
+    }, {} as Record<number, typeof users[0]>);
 
     const handleDelete = (id: number | undefined) => {
         if (!id) return;
@@ -29,9 +35,30 @@ export default function ProductListScreen() {
     };
 
     const filteredProducts = products.filter(product =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.sku.toLowerCase().includes(searchQuery.toLowerCase())
+        product.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const renderImageCarousel = (images: string[]) => {
+        if (!images || images.length === 0) return null;
+
+        return (
+            <FlatList
+                data={images}
+                keyExtractor={(item, index) => index.toString()}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                renderItem={({ item }) => (
+                    <Image source={{ uri: item }} style={styles.carouselImage} />
+                )}
+                style={styles.carousel}
+            />
+        );
+    };
+
+    const handleCall = (phoneNumber: string) => {
+        Linking.openURL(`tel:${phoneNumber}`);
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -46,16 +73,27 @@ export default function ProductListScreen() {
                 keyExtractor={(item) => item.id?.toString() || ''}
                 renderItem={({ item }) => (
                     <Card style={styles.card} mode="elevated">
-                        {item.image_path ? (
-                            <Card.Cover source={{ uri: item.image_path }} style={styles.image} />
+                        {item.images && item.images.length > 0 ? (
+                            renderImageCarousel(item.images)
                         ) : null}
                         <Card.Content>
                             <Title>{item.name}</Title>
-                            <Paragraph>SKU: {item.sku}</Paragraph>
                             <Paragraph>Price: ${item.price.toFixed(2)}</Paragraph>
-                            <Paragraph>Stock: {item.stock}</Paragraph>
+                            {item.note ? <Paragraph>Note: {item.note}</Paragraph> : null}
+                            {item.delivery_date ? (
+                                <Paragraph>Delivery Date: {new Date(item.delivery_date).toLocaleDateString()}</Paragraph>
+                            ) : null}
+                            {item.user_id && userMap[item.user_id] ? (
+                                <Paragraph>User: {userMap[item.user_id].name}</Paragraph>
+                            ) : null}
                         </Card.Content>
                         <Card.Actions>
+                            {item.user_id && userMap[item.user_id]?.phone ? (
+                                <IconButton
+                                    icon="phone"
+                                    onPress={() => handleCall(userMap[item.user_id!].phone)}
+                                />
+                            ) : null}
                             <IconButton
                                 icon="pencil"
                                 onPress={() => router.push(`/products/form?productId=${item.id}`)}
@@ -90,10 +128,17 @@ const styles = StyleSheet.create({
         paddingBottom: 80,
     },
     card: {
-        marginBottom: 12,
+        marginBottom: 16,
     },
-    image: {
+    carousel: {
         height: 200,
+        marginBottom: 8,
+    },
+    carouselImage: {
+        width: Dimensions.get('window').width - 32, // Full width minus padding
+        height: 200,
+        borderTopLeftRadius: 12,
+        borderTopRightRadius: 12,
     },
     fab: {
         position: 'absolute',

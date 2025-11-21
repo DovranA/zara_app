@@ -1,81 +1,74 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, Image, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, FlatList, Linking, Alert } from 'react-native';
 import { FAB, Card, Title, Paragraph, IconButton, Searchbar, useTheme } from 'react-native-paper';
-import { NavigationProp } from '@react-navigation/native';
-import { dbService, Product } from '../services/database';
+import { useRouter } from 'expo-router';
+import { useUsers, useDeleteUser } from '../../../services/queries';
 
-interface ProductListScreenProps {
-    navigation: NavigationProp<any>;
-}
-
-export default function ProductListScreen({ navigation }: ProductListScreenProps) {
-    const [products, setProducts] = useState<Product[]>([]);
+export default function UserListScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const theme = useTheme();
+    const router = useRouter();
 
-    useEffect(() => {
-        loadProducts();
-        const unsubscribe = navigation.addListener('focus', () => {
-            loadProducts();
-        });
-        return unsubscribe;
-    }, [navigation]);
+    const { data: users = [], isLoading } = useUsers();
+    const deleteUserMutation = useDeleteUser();
 
-    const loadProducts = async () => {
-        const data = await dbService.getProducts();
-        setProducts(data);
+    const handleCall = (phone: string) => {
+        if (phone) {
+            Linking.openURL(`tel:${phone}`);
+        } else {
+            Alert.alert('No Phone Number', 'This user does not have a phone number.');
+        }
     };
 
     const handleDelete = (id: number | undefined) => {
         if (!id) return;
         Alert.alert(
-            'Delete Product',
-            'Are you sure you want to delete this product?',
+            'Delete User',
+            'Are you sure you want to delete this user?',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: async () => {
-                        await dbService.deleteProduct(id);
-                        loadProducts();
-                    },
+                    onPress: () => deleteUserMutation.mutate(id),
                 },
             ]
         );
     };
 
-    const filteredProducts = products.filter(product =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.sku.toLowerCase().includes(searchQuery.toLowerCase())
+    const filteredUsers = users.filter(user =>
+        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.phone.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return (
         <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <Searchbar
-                placeholder="Search products..."
+                placeholder="Search users..."
                 onChangeText={setSearchQuery}
                 value={searchQuery}
                 style={styles.searchbar}
             />
             <FlatList
-                data={filteredProducts}
+                data={filteredUsers}
                 keyExtractor={(item) => item.id?.toString() || ''}
                 renderItem={({ item }) => (
                     <Card style={styles.card} mode="elevated">
-                        {item.image_path ? (
-                            <Card.Cover source={{ uri: item.image_path }} style={styles.image} />
-                        ) : null}
                         <Card.Content>
                             <Title>{item.name}</Title>
-                            <Paragraph>SKU: {item.sku}</Paragraph>
-                            <Paragraph>Price: ${item.price.toFixed(2)}</Paragraph>
-                            <Paragraph>Stock: {item.stock}</Paragraph>
+                            <Paragraph>{item.address}</Paragraph>
+                            <Paragraph>{item.phone}</Paragraph>
+                            {item.email && <Paragraph>{item.email}</Paragraph>}
                         </Card.Content>
                         <Card.Actions>
                             <IconButton
+                                icon="phone"
+                                mode="contained"
+                                onPress={() => handleCall(item.phone)}
+                            />
+                            <IconButton
                                 icon="pencil"
-                                onPress={() => navigation.navigate('ProductForm', { productId: item.id })}
+                                onPress={() => router.push(`/users/form?userId=${item.id}`)}
                             />
                             <IconButton
                                 icon="delete"
@@ -89,7 +82,7 @@ export default function ProductListScreen({ navigation }: ProductListScreenProps
             <FAB
                 icon="plus"
                 style={styles.fab}
-                onPress={() => navigation.navigate('ProductForm')}
+                onPress={() => router.push('/users/form')}
             />
         </View>
     );
@@ -104,12 +97,10 @@ const styles = StyleSheet.create({
     },
     list: {
         padding: 16,
+        paddingBottom: 80,
     },
     card: {
         marginBottom: 12,
-    },
-    image: {
-        height: 200,
     },
     fab: {
         position: 'absolute',

@@ -3,8 +3,8 @@ import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 're
 import { TextInput, Button, useTheme, Paragraph } from 'react-native-paper';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
-import { useUser, useCreateUser, useUpdateUser } from '../../services/queries';
-import { User } from '../../services/database';
+import { useUser, useCreateUser, useUpdateUser } from '../../../services/queries';
+import type { User } from '../../../services/database';
 
 export default function UserFormScreen() {
     const theme = useTheme();
