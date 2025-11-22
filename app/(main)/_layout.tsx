@@ -1,7 +1,7 @@
 import { Tabs } from "expo-router";
 import { Platform } from "react-native";
 import { BottomNavigation, Icon, useTheme } from "react-native-paper";
-import { CommonActions } from '@react-navigation/native';
+import { CommonActions } from "@react-navigation/native";
 
 export default function MainLayout() {
   const theme = useTheme();
@@ -14,14 +14,18 @@ export default function MainLayout() {
         //   android: "fade_from_bottom",
         //   ios: "default"
         // }),
+        // tabBarStyle: { height: 10, borderColor: "red", borderWidth: 2 },
       }}
       tabBar={({ navigation, state, descriptors, insets }) => (
         <BottomNavigation.Bar
+          style={{
+            maxHeight: 85,
+          }}
           navigationState={state}
           safeAreaInsets={insets}
           onTabPress={({ route, preventDefault }) => {
             const event = navigation.emit({
-              type: 'tabPress',
+              type: "tabPress",
               target: route.key,
               canPreventDefault: true,
             });
@@ -49,8 +53,8 @@ export default function MainLayout() {
               options.tabBarLabel !== undefined
                 ? options.tabBarLabel
                 : options.title !== undefined
-                  ? options.title
-                  : route.name;
+                ? options.title
+                : route.name;
 
             return label as string;
           }}
@@ -87,7 +91,6 @@ export default function MainLayout() {
           },
         }}
       />
-
     </Tabs>
   );
 }

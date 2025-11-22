@@ -38,9 +38,22 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <PaperProvider theme={darkTheme} >
-        <SafeAreaView style={[styles.container, { backgroundColor: darkTheme.colors.background }]}>
-          <StatusBar showHideTransition={"slide"} barStyle="light-content" backgroundColor={darkTheme.colors.background} />
+      <PaperProvider theme={darkTheme}>
+        <SafeAreaView
+          style={[
+            styles.container,
+            {
+              backgroundColor: darkTheme.colors.background,
+              width: "auto",
+              height: "auto",
+            },
+          ]}
+        >
+          <StatusBar
+            showHideTransition={"slide"}
+            barStyle="dark-content"
+            backgroundColor={darkTheme.colors.background}
+          />
           <Stack
             screenOptions={{
               headerStyle: {
@@ -53,16 +66,12 @@ export default function RootLayout() {
               },
               animation: Platform.select({
                 android: "fade_from_bottom",
-                ios: "default"
+                ios: "default",
               }),
             }}
           >
-            <Stack.Screen
-              name="(main)"
-            />
-            <Stack.Screen
-              name="(form)"
-            />
+            <Stack.Screen name="(main)" />
+            <Stack.Screen name="(form)" />
           </Stack>
         </SafeAreaView>
       </PaperProvider>

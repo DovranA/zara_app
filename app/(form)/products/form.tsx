@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Image, Alert, KeyboardAvoidingView, Platform, TouchableOpacity, Keyboard } from 'react-native';
-import { TextInput, Button, useTheme, Paragraph, Menu, IconButton, Modal, Portal, List, Title, Searchbar } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Keyboard } from 'react-native';
+import { TextInput, Button, useTheme, Paragraph } from 'react-native-paper';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
-import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useProduct, useCreateProduct, useUpdateProduct, useUsers } from '../../../services/queries';
 import type { Product } from '../../../services/database';
+import ProductImagePicker from '../../../components/product/ProductImagePicker';
+import UserSelectionModal from '../../../components/product/UserSelectionModal';
 
 export default function ProductFormScreen() {
     const theme = useTheme();
@@ -20,7 +21,6 @@ export default function ProductFormScreen() {
     const updateProductMutation = useUpdateProduct();
 
     const [visible, setVisible] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
     const [keyboardHeight, setKeyboardHeight] = useState(0);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const openMenu = () => setVisible(true);
@@ -56,10 +56,6 @@ export default function ProductFormScreen() {
     const userId = watch('user_id');
     const selectedUser = users.find(u => u.id === userId);
 
-    const filteredUsers = users.filter(user =>
-        user.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
     useEffect(() => {
         if (product) {
             reset({
@@ -72,39 +68,6 @@ export default function ProductFormScreen() {
             });
         }
     }, [product, reset]);
-
-    const pickImage = async (useCamera: boolean) => {
-        const { status } = useCamera
-            ? await ImagePicker.requestCameraPermissionsAsync()
-            : await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-        if (status !== 'granted') {
-            Alert.alert('Permission Denied', 'We need permission to access your camera/gallery.');
-            return;
-        }
-
-        const result = useCamera
-            ? await ImagePicker.launchCameraAsync({
-                allowsEditing: true,
-                aspect: [4, 3],
-                quality: 0.8,
-            })
-            : await ImagePicker.launchImageLibraryAsync({
-                quality: 0.8,
-                allowsMultipleSelection: true,
-            });
-
-        if (!result.canceled) {
-            const newImages = result.assets.map(asset => asset.uri);
-            setValue('images', [...images, ...newImages]);
-        }
-    };
-
-    const removeImage = (index: number) => {
-        const newImages = [...images];
-        newImages.splice(index, 1);
-        setValue('images', newImages);
-    };
 
     const onSubmit = async (data: Product) => {
         if (productId) {
@@ -124,42 +87,11 @@ export default function ProductFormScreen() {
             <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
                 <View style={styles.form}>
 
-                    <Paragraph style={styles.label}>Images</Paragraph>
-                    <ScrollView horizontal style={styles.imageList} contentContainerStyle={styles.imageListContent}>
-                        {images.map((uri, index) => (
-                            <View key={index} style={styles.imageContainer}>
-                                <Image source={{ uri }} style={styles.image} />
-                                <IconButton
-                                    icon="close-circle"
-                                    size={20}
-                                    style={styles.removeButton}
-                                    onPress={() => removeImage(index)}
-                                />
-                            </View>
-                        ))}
-                        <TouchableOpacity style={[styles.addImageButton, { borderColor: theme.colors.primary }]} onPress={() => pickImage(false)}>
-                            <IconButton icon="plus" iconColor={theme.colors.primary} />
-                        </TouchableOpacity>
-                    </ScrollView>
-
-                    <View style={styles.imageButtons}>
-                        <Button
-                            mode="outlined"
-                            icon="camera"
-                            onPress={() => pickImage(true)}
-                            style={styles.imageButton}
-                        >
-                            Take Photo
-                        </Button>
-                        <Button
-                            mode="outlined"
-                            icon="image-multiple"
-                            onPress={() => pickImage(false)}
-                            style={styles.imageButton}
-                        >
-                            Add Photos
-                        </Button>
-                    </View>
+                    <ProductImagePicker
+                        images={images}
+                        onImagesChange={(newImages) => setValue('images', newImages)}
+                        theme={theme}
+                    />
 
                     <Controller
                         control={control}
@@ -257,45 +189,15 @@ export default function ProductFormScreen() {
                         )}
                     />
 
-                    <Portal>
-                        <Modal
-                            visible={visible}
-                            onDismiss={closeMenu}
-                            contentContainerStyle={[
-                                styles.modalContent,
-                                {
-                                    backgroundColor: theme.colors.surface,
-                                    bottom: Platform.OS === 'ios' ? keyboardHeight : 0
-                                }
-                            ]}
-                        >
-                            <View style={styles.sheetHeader}>
-                                <Title style={styles.sheetTitle}>Assign User</Title>
-                                <IconButton icon="close" size={20} onPress={closeMenu} />
-                            </View>
-                            <Searchbar
-                                placeholder="Search users..."
-                                onChangeText={setSearchQuery}
-                                value={searchQuery}
-                                style={styles.searchbar}
-                            />
-                            <ScrollView style={styles.userList}>
-                                {filteredUsers.map((user) => (
-                                    <List.Item
-                                        key={user.id}
-                                        title={user.name}
-                                        left={(props: any) => <List.Icon {...props} icon="account" />}
-                                        right={(props: any) => user.id === userId ? <List.Icon {...props} icon="check" color={theme.colors.primary} /> : null}
-                                        onPress={() => {
-                                            setValue('user_id', user.id);
-                                            closeMenu();
-                                        }}
-                                        style={styles.userItem}
-                                    />
-                                ))}
-                            </ScrollView>
-                        </Modal>
-                    </Portal>
+                    <UserSelectionModal
+                        visible={visible}
+                        onDismiss={closeMenu}
+                        users={users}
+                        onSelectUser={(id) => setValue('user_id', id)}
+                        selectedUserId={userId}
+                        theme={theme}
+                        keyboardHeight={keyboardHeight}
+                    />
 
                     <Button
                         mode="contained"
@@ -319,50 +221,6 @@ const styles = StyleSheet.create({
         padding: 16,
         paddingBottom: 80,
     },
-    label: {
-        marginBottom: 8,
-        fontWeight: 'bold',
-    },
-    imageList: {
-        marginBottom: 16,
-    },
-    imageListContent: {
-        alignItems: 'center',
-    },
-    imageContainer: {
-        marginRight: 8,
-        position: 'relative',
-    },
-    image: {
-        width: 100,
-        height: 100,
-        borderRadius: 8,
-    },
-    removeButton: {
-        position: 'absolute',
-        top: -8,
-        right: -8,
-        backgroundColor: 'white',
-        margin: 0,
-    },
-    addImageButton: {
-        width: 100,
-        height: 100,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderStyle: 'dashed',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    imageButtons: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 16,
-    },
-    imageButton: {
-        flex: 1,
-        marginHorizontal: 4,
-    },
     input: {
         marginBottom: 16,
     },
@@ -374,40 +232,5 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: -12,
         marginBottom: 8,
-    },
-    modalContent: {
-        backgroundColor: 'white',
-        padding: 20,
-        margin: 0,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        maxHeight: '50%',
-    },
-    sheetHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    sheetTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    searchbar: {
-        marginBottom: 10,
-        elevation: 0,
-        backgroundColor: 'transparent',
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    userList: {
-        maxHeight: 300,
-    },
-    userItem: {
-        paddingVertical: 8,
     },
 });
